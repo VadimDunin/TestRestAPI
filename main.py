@@ -3,6 +3,8 @@ from subprocess import Popen
 from subprocess import PIPE
 
 debug = True
+use_curl = False
+use_requests_lib = True
 
 base_url = "192.168.1.103:8090"
 port = "8090"
@@ -30,12 +32,13 @@ class BadResponses:
     response_list = ["<Response [404]>"]
 
 
-class MyRequests(Utils):
-    def __init__(self, base_url, port, credentials):
+class RestAPI(Utils):
+    def __init__(self, base_url=base_url, port=port, credentials=Credentials):
         self.base_url = base_url
         self.port = port
         self.username = credentials.username
         self.password = credentials.password
+        self.terminal = TerminalRequests(self)
 
     def request_post(self, req):
         try:
@@ -52,7 +55,6 @@ class MyRequests(Utils):
 
     def request_via_curl(self, req=None):
         if req is not None:
-            # full_request = "curl -k -X {}".format(req)
             full_request = req
             self.debug_msg(full_request)
             return self.run_cmd(full_request)[1]
@@ -75,65 +77,25 @@ class MyRequests(Utils):
             if str(response) == str(value):
                 print("Возникла ошибка при выполнении запроса: {}".format(response))
 
-    def exec_request(self):
-        pass
+    def exec_request(self, request):
+        if use_curl:
+            self.request_via_curl(req=request)
+        elif use_requests_lib:
+            self.request_get(req=request)
 
 
-class TerminalRequests(MyRequests):
-    def __init__(self, base_url=base_url, port=port, credentials=Credentials):
-        super().__init__(base_url, port, credentials)
-        self.base_url = base_url
+class TerminalRequests:
+    def __init__(self, app):
+        self.app = app
+        self.base_url = self.app.base_url
         self.auth_segment = "auth/session"
         self.auth_login = ' -H  "accept: application/json" -H  "Content-Type: application/json" -d "{\"username\": \"admin\",  \"password\": \"admin\"}\"'
         self.auth_request = "https://{}/{}\"".format(self.base_url, self.auth_segment) + self.auth_login
 
     def request_auth(self):
-        print(self.request_via_curl(self.auth_request))
+        print(self.app.exec_request(self.auth_request))
 
 
 if __name__ == '__main__':
-    TR = TerminalRequests()
-    # TR.response_parser(TR.request_post(TR.auth_request))
-    # TR.request_auth()
-    auth_req = 'curl -k -X POST "https://'+base_url+'/auth/session" -H  "accept: application/json" -H  "Content-Type: application/json" -d "{  \"username\": \"admin\",  \"password\": \"admin\"}"'
-    output = TR.request_via_curl(auth_req)
-    print(output)
-
-    # url = 'http://ES_search_demo.com/document/record/_search?pretty=true'
-    # data = '''{
-    #   "query": {
-    #     "bool": {
-    #       "must": [
-    #         {
-    #           "text": {
-    #             "record.document": "SOME_JOURNAL"
-    #           }
-    #         },
-    #         {
-    #           "text": {
-    #             "record.articleTitle": "farmers"
-    #           }
-    #         }
-    #       ],
-    #       "must_not": [],
-    #       "should": []
-    #     }
-    #   },
-    #   "from": 0,
-    #   "size": 50,
-    #   "sort": [],
-    #   "facets": {}
-    # }'''
-#    response = requests.post(url, data=data)
-
-# curl -X POST "https://192.168.111.170:8090/auth/session" -H  "accept: application/json" -H  "Content-Type: application/json" -d "{  \"username\": \"admin\",  \"password\": \"admin\"}"
-
-
-# url='https://192.168.111.170:8090/auth/session" -H  "accept: application/json" -H  "Content-Type: application/json" -d '
-# data='''
-# {  \"username\": \"admin\",
-#   \"password\": \"admin\"}"
-# '''
-
-# response = requests.post(url, data, verify=False)
-# print(response)
+    TR = RestAPI()
+    TR.terminal.request_auth()
